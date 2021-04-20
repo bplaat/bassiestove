@@ -41,6 +41,9 @@ class Constants:
     STOVE_TEMP_MAX = 350
     STOVE_TEMP_INC = 10
 
+    TIMER_MAX = 60 * 60 - 1
+    TIMER_INC = 5
+
     def __init__(self):
         bassiestove = sp.world.bassieStove
 
@@ -56,6 +59,9 @@ class Constants:
         bassiestove.STOVE_COUNT.set(self.STOVE_COUNT)
         bassiestove.STOVE_TEMP_MAX.set(self.STOVE_TEMP_MAX)
         bassiestove.STOVE_TEMP_INC.set(self.STOVE_TEMP_INC)
+
+        bassiestove.TIMER_MAX.set(self.TIMER_MAX)
+        bassiestove.TIMER_INC.set(self.TIMER_INC)
 
         bassiestove.page.set(self.PAGE_LOCK)
         bassiestove.randSeed.set(random.randint(0, 3600))

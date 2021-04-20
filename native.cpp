@@ -93,6 +93,9 @@ void setup() {
     STOVE_TEMP_MAX = 350;
     STOVE_TEMP_INC = 10;
 
+    TIMER_MAX = 60 * 60 - 1;
+    TIMER_INC = 5;
+
     page = PAGE_LOCK;
     randSeed = random(0, 3600);
 
@@ -120,6 +123,13 @@ void loop() {
     rightButton = !digitalRead(RIGHT_BUTTON_PIN);
 
     cycle();
+
+    // Write beeper tone
+    if (beeperFrequency != 0) {
+        tone(BEEPER_BIN, beeperFrequency);
+    } else {
+        noTone(BEEPER_BIN);
+    }
 
     // Write back stove values
     analogWrite(STOVE_1_LED_PIN, stove1Value / STOVE_TEMP_MAX * 255);
@@ -251,27 +261,27 @@ void loop() {
 
         // View timer page
         if (page == PAGE_VIEW_TIMER) {
-            // lcd.clear();
-            // print_centered(0, "The timer");
+            lcd.clear();
+            print_centered(0, "Timer");
 
-            // char tempString[LCD_WIDTH];
-            // int time = timerTime - timerTimer;
-            // sprintf(tempString, "%02d:%02d remaining", time / 60, time % 60);
-            // print_centered(1, !timerRunning ? "No timer is running" : tempString);
+            char tempString[LCD_WIDTH];
+            int timeRemaining = timerTime - elapsed1(timerTimer);
+            sprintf(tempString, "%02d:%02d remaining", (int)(timeRemaining / 60), (int)timeRemaining % 60);
+            print_centered(1, timerStarted ? (timerFinished ? "Timer finished" : tempString) : "No timer is running");
 
-            // print_columns_centered(3, 3,
-            //     "BACK",
-            //     timerRunning ? "PAUSE" : "",
-            //     timerRunning ? "STOP" : "CREATE",
-            // );
+            print_columns_centered(3, 3, "BACK", "", timerStarted ? "STOP" : "CREATE");
         }
 
         // Change timer page
         if (page == PAGE_CHANGE_TIMER) {
-            // lcd.clear();
-            // print_centered(0, "Timer:");
-            // print_centered(1, "No timer set");
-            // print_columns_centered(3, 3, "BACK", "", "START");
+            lcd.clear();
+            print_centered(0, "Create a timer:");
+
+            char tempString[LCD_WIDTH];
+            sprintf(tempString, "Time: %02d:%02d", (int)(timerTime / 60), (int)timerTime % 60);
+            print_centered(1, tempString);
+
+            print_columns_centered(3, 3, "START", "DOWN", "UP");
         }
     }
 }

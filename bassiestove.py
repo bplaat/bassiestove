@@ -49,10 +49,17 @@ class BassieStove(simpylc.Module):
         self.STOVE_TEMP_MAX = simpylc.Register()
         self.STOVE_TEMP_INC = simpylc.Register()
 
+        self.group('Timer constants')
+        self.TIMER_MAX = simpylc.Register()
+        self.TIMER_INC = simpylc.Register()
+
         # ############# State #############
         self.group('Global state', True)
         self.randSeed = simpylc.Register()
         self.cycleCounter = simpylc.Register()
+
+        self.group('Beeper state')
+        self.beeperFrequency = simpylc.Register()
 
         self.group('Page state')
         self.page = simpylc.Register()
@@ -60,19 +67,21 @@ class BassieStove(simpylc.Module):
         self.selectedLock = simpylc.Register()
         self.selectedStove = simpylc.Register(1)
         self.updateScreen = simpylc.Marker()
+        self.updateScreenTimer = simpylc.Timer()
 
         self.group('Timer state')
         self.timerTime = simpylc.Register()
         self.timerTimer = simpylc.Timer()
-        self.timerRunning = simpylc.Marker()
+        self.timerStarted = simpylc.Marker()
+        self.timerFinished = simpylc.Marker()
 
         # ############# Locals #############
-        self.group('Lock page locals')
+        self.group('Lock page locals', True)
         self.lock1ButtonTrigger = simpylc.Marker()
         self.lock2ButtonTrigger = simpylc.Marker()
         self.lock3ButtonTrigger = simpylc.Marker()
 
-        self.group('Main page locals', True)
+        self.group('Main page locals')
         self.changeButtonTrigger = simpylc.Marker()
         self.timerButtonTrigger = simpylc.Marker()
         self.lockButtonTrigger = simpylc.Marker()
@@ -83,7 +92,7 @@ class BassieStove(simpylc.Module):
         self.leftButtonTrigger = simpylc.Marker()
         self.rightButtonTrigger = simpylc.Marker()
 
-        self.group('Change stove page locals')
+        self.group('Change stove page locals', True)
         self.backButtonTrigger = simpylc.Marker()
         self.newStove1Temperature = simpylc.Register()
         self.newStove2Temperature = simpylc.Register()
@@ -94,8 +103,13 @@ class BassieStove(simpylc.Module):
 
         self.group('View timer page locals')
         self.back2ButtonTrigger = simpylc.Marker()
-        self.change2ButtonTrigger = simpylc.Marker()
-        self.stopButtonTrigger = simpylc.Marker()
+        self.createStopButtonTrigger = simpylc.Marker()
+
+        self.group('Change timer page locals')
+        self.startButtonTrigger = simpylc.Marker()
+        self.newTimerTime = simpylc.Register()
+        self.down2ButtonTrigger = simpylc.Marker()
+        self.up2ButtonTrigger = simpylc.Marker()
 
         # ############# Stoves #############
         self.group('Stoves', True)
@@ -158,7 +172,13 @@ class BassieStove(simpylc.Module):
         self.rightButtonOneshot.trigger(self.rightButton)
         self.rightButtonHandled.mark(False)
 
-        # ############# State #############
+        # ############# Timer state #############
+
+        self.timerTimer.reset(not self.timerStarted)
+        self.timerFinished.mark(True, self.timerStarted and self.timerTimer >= self.timerTime)
+        self.beeperFrequency.set(440, self.timerFinished, 0)
+
+        # ############# Page state #############
 
         # Clear update screen
         self.updateScreen.mark(False)
@@ -169,17 +189,17 @@ class BassieStove(simpylc.Module):
         self.lock1ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 1 and self.leftButtonOneshot and not self.leftButtonHandled)
         self.lockCounter.set(self.lockCounter + 1, self.lock1ButtonTrigger)
         self.selectedLock.set(0, self.lock1ButtonTrigger)
-        self.leftButtonHandled.mark(self.lock1ButtonTrigger, self.lock1ButtonTrigger)
+        self.leftButtonHandled.mark(True, self.lock1ButtonTrigger)
 
         self.lock2ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 2 and self.middleButtonOneshot and not self.middleButtonHandled)
         self.lockCounter.set(self.lockCounter + 1, self.lock2ButtonTrigger)
         self.selectedLock.set(0, self.lock2ButtonTrigger)
-        self.middleButtonHandled.mark(self.lock2ButtonTrigger, self.lock2ButtonTrigger)
+        self.middleButtonHandled.mark(True, self.lock2ButtonTrigger)
 
         self.lock3ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 3 and self.rightButtonOneshot and not self.rightButtonHandled)
         self.lockCounter.set(self.lockCounter + 1, self.lock3ButtonTrigger)
         self.selectedLock.set(0, self.lock3ButtonTrigger)
-        self.rightButtonHandled.mark(self.lock3ButtonTrigger, self.lock3ButtonTrigger)
+        self.rightButtonHandled.mark(True, self.lock3ButtonTrigger)
 
         self.selectedLock.set(((self.randSeed + self.cycleCounter) % 3) + 1, self.selectedLock == 0)
 
@@ -189,35 +209,35 @@ class BassieStove(simpylc.Module):
         # Main page
         self.changeButtonTrigger.mark(self.page == self.PAGE_MAIN and self.leftButtonOneshot and not self.leftButtonHandled)
         self.page.set(self.PAGE_SELECT_STOVE, self.changeButtonTrigger)
-        self.leftButtonHandled.mark(self.changeButtonTrigger, self.changeButtonTrigger)
+        self.leftButtonHandled.mark(True, self.changeButtonTrigger)
 
         self.timerButtonTrigger.mark(self.page == self.PAGE_MAIN and self.middleButtonOneshot and not self.middleButtonHandled)
         self.page.set(self.PAGE_VIEW_TIMER, self.timerButtonTrigger)
-        self.middleButtonHandled.mark(self.timerButtonTrigger, self.timerButtonTrigger)
+        self.middleButtonHandled.mark(True, self.timerButtonTrigger)
 
         self.lockButtonTrigger.mark(self.page == self.PAGE_MAIN and self.rightButtonOneshot and not self.rightButtonHandled)
         self.page.set(self.PAGE_LOCK, self.lockButtonTrigger)
-        self.rightButtonHandled.mark(self.lockButtonTrigger, self.lockButtonTrigger)
+        self.rightButtonHandled.mark(True, self.lockButtonTrigger)
 
         # Select stove page
         self.selectButtonTrigger.mark(self.page == self.PAGE_SELECT_STOVE and self.leftButtonOneshot and not self.leftButtonHandled)
         self.page.set(self.PAGE_CHANGE_STOVE, self.selectButtonTrigger)
-        self.leftButtonHandled.mark(self.selectButtonTrigger, self.selectButtonTrigger)
+        self.leftButtonHandled.mark(True, self.selectButtonTrigger)
 
         self.leftButtonTrigger.mark(self.page == self.PAGE_SELECT_STOVE and self.middleButtonOneshot and not self.middleButtonHandled)
         self.newSelectedStove.set(self.selectedStove - 1, self.selectedStove > 1, self.STOVE_COUNT)
         self.selectedStove.set(self.newSelectedStove, self.leftButtonTrigger)
-        self.middleButtonHandled.mark(self.leftButtonTrigger, self.leftButtonTrigger)
+        self.middleButtonHandled.mark(True, self.leftButtonTrigger)
 
         self.rightButtonTrigger.mark(self.page == self.PAGE_SELECT_STOVE and self.rightButtonOneshot and not self.rightButtonHandled)
         self.newSelectedStove.set(self.selectedStove + 1, self.selectedStove < self.STOVE_COUNT, 1)
         self.selectedStove.set(self.newSelectedStove, self.rightButtonTrigger)
-        self.middleButtonHandled.mark(self.rightButtonTrigger, self.rightButtonTrigger)
+        self.middleButtonHandled.mark(True, self.rightButtonTrigger)
 
         # Change stove page
         self.backButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.leftButtonOneshot and not self.leftButtonHandled)
         self.page.set(self.PAGE_MAIN, self.backButtonTrigger)
-        self.leftButtonHandled.mark(self.backButtonTrigger, self.backButtonTrigger)
+        self.leftButtonHandled.mark(True, self.backButtonTrigger)
 
         self.downButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.middleButtonOneshot and not self.middleButtonHandled)
 
@@ -233,7 +253,7 @@ class BassieStove(simpylc.Module):
         self.newStove4Temperature.set(self.stove4Target - self.STOVE_TEMP_INC, self.stove4Target > 0, 0)
         self.stove4Target.set(self.newStove4Temperature, self.downButtonTrigger and self.selectedStove == 4)
 
-        self.middleButtonHandled.mark(self.downButtonTrigger, self.downButtonTrigger)
+        self.middleButtonHandled.mark(True, self.downButtonTrigger)
 
         self.upButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.rightButtonOneshot and not self.rightButtonHandled)
 
@@ -249,20 +269,39 @@ class BassieStove(simpylc.Module):
         self.newStove4Temperature.set(self.stove4Target + self.STOVE_TEMP_INC, self.stove4Target < self.STOVE_TEMP_MAX, self.STOVE_TEMP_MAX)
         self.stove4Target.set(self.newStove4Temperature, self.upButtonTrigger and self.selectedStove == 4)
 
-        self.rightButtonHandled.mark(self.upButtonTrigger, self.upButtonTrigger)
+        self.rightButtonHandled.mark(True, self.upButtonTrigger)
 
         # View timer page
-        # self.back2ButtonTrigger.mark(self.page == self.PAGE_VIEW_TIMER and self.leftButtonOneshot and not self.leftButtonHandled)
-        # self.page.set(self.PAGE_MAIN, self.back2ButtonTrigger)
-        # self.leftButtonHandled.mark(self.back2ButtonTrigger, self.back2ButtonTrigger)
+        self.back2ButtonTrigger.mark(self.page == self.PAGE_VIEW_TIMER and self.leftButtonOneshot and not self.leftButtonHandled)
+        self.page.set(self.PAGE_MAIN, self.back2ButtonTrigger)
+        self.leftButtonHandled.mark(True, self.back2ButtonTrigger)
 
-        # self.change2ButtonTrigger.mark(self.page == self.PAGE_VIEW_TIMER and self.middleButtonOneshot and not self.middleButtonHandled)
-        # self.page.set(self.PAGE_CHANGE_TIMER, self.change2ButtonTrigger)
-        # self.middleButtonHandled.mark(self.change2ButtonTrigger, self.change2ButtonTrigger)
+        self.createStopButtonTrigger.mark(self.page == self.PAGE_VIEW_TIMER and self.rightButtonOneshot and not self.rightButtonHandled)
+        self.page.set(self.PAGE_CHANGE_TIMER, self.createStopButtonTrigger and not self.timerStarted)
+        self.timerFinished.mark(False, self.createStopButtonTrigger and self.timerStarted)
+        self.timerStarted.mark(False, self.createStopButtonTrigger and self.timerStarted)
+        self.rightButtonHandled.mark(True, self.createStopButtonTrigger)
 
         # Change timer page
-        # TODO
+        self.startButtonTrigger.mark(self.page == self.PAGE_CHANGE_TIMER and self.leftButtonOneshot and not self.leftButtonHandled)
+        self.page.set(self.PAGE_VIEW_TIMER, self.startButtonTrigger)
+        self.timerStarted.mark(True, self.startButtonTrigger)
+        self.leftButtonHandled.mark(True, self.startButtonTrigger)
+
+        self.down2ButtonTrigger.mark(self.page == self.PAGE_CHANGE_TIMER and self.middleButtonOneshot and not self.middleButtonHandled)
+        self.newTimerTime.set(self.timerTime - self.TIMER_INC, self.timerTime > 0, 0)
+        self.timerTime.set(self.newTimerTime, self.down2ButtonTrigger)
+        self.middleButtonHandled.mark(True, self.down2ButtonTrigger)
+
+        self.up2ButtonTrigger.mark(self.page == self.PAGE_CHANGE_TIMER and self.rightButtonOneshot and not self.rightButtonHandled)
+        self.newTimerTime.set(self.timerTime + self.TIMER_INC, self.timerTime < self.TIMER_MAX, self.TIMER_MAX)
+        self.timerTime.set(self.newTimerTime, self.up2ButtonTrigger)
+        self.rightButtonHandled.mark(True, self.up2ButtonTrigger)
 
         # Trigger update screen when a button was handled
-        self.updateScreen.mark(self.leftButtonHandled or self.middleButtonHandled or self.rightButtonHandled)
+        self.updateScreenTimer.reset(self.updateScreenTimer > 0.75)
+        self.updateScreen.mark(self.leftButtonHandled or self.middleButtonHandled or self.rightButtonHandled or (
+                self.page == self.PAGE_CHANGE_STOVE or
+                (self.page == self.PAGE_VIEW_TIMER and self.timerStarted)
+            ) and self.updateScreenTimer < 0.02)
         self.cycleCounter.set(self.cycleCounter + 1)
