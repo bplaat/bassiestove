@@ -81,11 +81,12 @@ void setup() {
 
     // Init constants
     PAGE_LOCK = 0;
-    PAGE_MAIN = 1;
-    PAGE_SELECT_STOVE = 2;
-    PAGE_CHANGE_STOVE = 3;
-    PAGE_VIEW_TIMER = 4;
-    PAGE_CHANGE_TIMER = 5;
+    PAGE_ALARM = 1;
+    PAGE_MAIN = 2;
+    PAGE_SELECT_STOVE = 3;
+    PAGE_CHANGE_STOVE = 4;
+    PAGE_VIEW_TIMER = 5;
+    PAGE_CHANGE_TIMER = 6;
 
     LOCK_COUNT = 5;
 
@@ -125,7 +126,7 @@ void loop() {
     cycle();
 
     // Write beeper tone
-    if (beeperFrequency != 0) {
+    if (beeperEnabled) {
         tone(BEEPER_BIN, beeperFrequency);
     } else {
         noTone(BEEPER_BIN);
@@ -150,6 +151,15 @@ void loop() {
                 selectedLock == 2 ? "PRESS" : "",
                 selectedLock == 3 ? "PRESS" : ""
             );
+        }
+
+        // Alarm page
+        if (page == PAGE_ALARM) {
+            lcd.clear();
+            print_centered(0, "BassieStove!");
+            print_centered(1, "You are a child!");
+            print_centered(2, "Reset for silence");
+            print_columns_centered(3, 3, "MAKE" ,"MORE", "NOISE");
         }
 
         // Main page

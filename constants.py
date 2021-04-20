@@ -29,11 +29,12 @@ import random
 
 class Constants:
     PAGE_LOCK = 0
-    PAGE_MAIN = 1
-    PAGE_SELECT_STOVE = 2
-    PAGE_CHANGE_STOVE = 3
-    PAGE_VIEW_TIMER = 4
-    PAGE_CHANGE_TIMER = 5
+    PAGE_ALARM = 1
+    PAGE_MAIN = 2
+    PAGE_SELECT_STOVE = 3
+    PAGE_CHANGE_STOVE = 4
+    PAGE_VIEW_TIMER = 5
+    PAGE_CHANGE_TIMER = 6
 
     LOCK_COUNT = 5
 
@@ -48,6 +49,7 @@ class Constants:
         bassiestove = sp.world.bassieStove
 
         bassiestove.PAGE_LOCK.set(self.PAGE_LOCK)
+        bassiestove.PAGE_ALARM.set(self.PAGE_ALARM)
         bassiestove.PAGE_MAIN.set(self.PAGE_MAIN)
         bassiestove.PAGE_SELECT_STOVE.set(self.PAGE_SELECT_STOVE)
         bassiestove.PAGE_CHANGE_STOVE.set(self.PAGE_CHANGE_STOVE)

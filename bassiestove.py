@@ -35,6 +35,7 @@ class BassieStove(simpylc.Module):
         # ############# Constants #############
         self.group('Page constants', True)
         self.PAGE_LOCK = simpylc.Register()
+        self.PAGE_ALARM = simpylc.Register()
         self.PAGE_MAIN = simpylc.Register()
         self.PAGE_SELECT_STOVE = simpylc.Register()
         self.PAGE_CHANGE_STOVE = simpylc.Register()
@@ -59,6 +60,7 @@ class BassieStove(simpylc.Module):
         self.cycleCounter = simpylc.Register()
 
         self.group('Beeper state')
+        self.beeperEnabled = simpylc.Marker()
         self.beeperFrequency = simpylc.Register()
 
         self.group('Page state')
@@ -80,6 +82,10 @@ class BassieStove(simpylc.Module):
         self.lock1ButtonTrigger = simpylc.Marker()
         self.lock2ButtonTrigger = simpylc.Marker()
         self.lock3ButtonTrigger = simpylc.Marker()
+
+        self.group('Alarm page locals')
+        self.alarmTimer = simpylc.Timer()
+        self.newBeeperFrequency = simpylc.Register()
 
         self.group('Main page locals')
         self.changeButtonTrigger = simpylc.Marker()
@@ -176,7 +182,8 @@ class BassieStove(simpylc.Module):
 
         self.timerTimer.reset(not self.timerStarted)
         self.timerFinished.mark(True, self.timerStarted and self.timerTimer >= self.timerTime)
-        self.beeperFrequency.set(440, self.timerFinished, 0)
+        self.beeperEnabled.mark(True, self.timerFinished)
+        self.beeperFrequency.set(440, self.timerFinished)
 
         # ############# Page state #############
 
@@ -186,25 +193,46 @@ class BassieStove(simpylc.Module):
         # Lock page
         self.selectedLock.set(((self.randSeed + self.cycleCounter) % 3) + 1, self.selectedLock == 0)
 
-        self.lock1ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 1 and self.leftButtonOneshot and not self.leftButtonHandled)
-        self.lockCounter.set(self.lockCounter + 1, self.lock1ButtonTrigger)
-        self.selectedLock.set(0, self.lock1ButtonTrigger)
+        # Lock page left button
+        self.lock1ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.leftButtonOneshot and not self.leftButtonHandled)
+
+        self.page.set(self.PAGE_ALARM, self.lock1ButtonTrigger and self.selectedLock != 1)
+
+        self.lockCounter.set(self.lockCounter + 1, self.lock1ButtonTrigger and self.selectedLock == 1)
+        self.selectedLock.set(0, self.lock1ButtonTrigger and self.selectedLock == 1)
+
         self.leftButtonHandled.mark(True, self.lock1ButtonTrigger)
 
-        self.lock2ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 2 and self.middleButtonOneshot and not self.middleButtonHandled)
-        self.lockCounter.set(self.lockCounter + 1, self.lock2ButtonTrigger)
-        self.selectedLock.set(0, self.lock2ButtonTrigger)
+        # Lock page middle button
+        self.lock2ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.middleButtonOneshot and not self.middleButtonHandled)
+
+        self.page.set(self.PAGE_ALARM, self.lock2ButtonTrigger and self.selectedLock != 2)
+
+        self.lockCounter.set(self.lockCounter + 1, self.lock2ButtonTrigger and self.selectedLock == 2)
+        self.selectedLock.set(0, self.lock2ButtonTrigger and self.selectedLock == 2)
+
         self.middleButtonHandled.mark(True, self.lock2ButtonTrigger)
 
-        self.lock3ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.selectedLock == 3 and self.rightButtonOneshot and not self.rightButtonHandled)
-        self.lockCounter.set(self.lockCounter + 1, self.lock3ButtonTrigger)
-        self.selectedLock.set(0, self.lock3ButtonTrigger)
+        # Lock page right button
+        self.lock3ButtonTrigger.mark(self.page == self.PAGE_LOCK and self.rightButtonOneshot and not self.rightButtonHandled)
+
+        self.page.set(self.PAGE_ALARM, self.lock3ButtonTrigger and self.selectedLock != 3)
+
+        self.lockCounter.set(self.lockCounter + 1, self.lock3ButtonTrigger and self.selectedLock == 3)
+        self.selectedLock.set(0, self.lock3ButtonTrigger and self.selectedLock == 3)
+
         self.rightButtonHandled.mark(True, self.lock3ButtonTrigger)
 
+        # Lock page counter
         self.selectedLock.set(((self.randSeed + self.cycleCounter) % 3) + 1, self.selectedLock == 0)
-
         self.page.set(self.PAGE_MAIN, self.lockCounter == self.LOCK_COUNT)
         self.lockCounter.set(0, self.lockCounter == self.LOCK_COUNT)
+
+        # Alarm page
+        self.alarmTimer.reset(self.alarmTimer >= 1)
+        self.beeperEnabled.mark(True, self.page == self.PAGE_ALARM and self.cycleCounter > 0)
+        self.newBeeperFrequency.set(880, self.beeperFrequency <= 440, 440)
+        self.beeperFrequency.set(self.newBeeperFrequency, self.page == self.PAGE_ALARM and self.cycleCounter > 0 and self.alarmTimer < 0.02)
 
         # Main page
         self.changeButtonTrigger.mark(self.page == self.PAGE_MAIN and self.leftButtonOneshot and not self.leftButtonHandled)
@@ -235,10 +263,13 @@ class BassieStove(simpylc.Module):
         self.middleButtonHandled.mark(True, self.rightButtonTrigger)
 
         # Change stove page
+
+        # Change stove page back button
         self.backButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.leftButtonOneshot and not self.leftButtonHandled)
         self.page.set(self.PAGE_MAIN, self.backButtonTrigger)
         self.leftButtonHandled.mark(True, self.backButtonTrigger)
 
+        # Change stove page down button
         self.downButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.middleButtonOneshot and not self.middleButtonHandled)
 
         self.newStove1Temperature.set(self.stove1Target - self.STOVE_TEMP_INC, self.stove1Target > 0, 0)
@@ -255,6 +286,7 @@ class BassieStove(simpylc.Module):
 
         self.middleButtonHandled.mark(True, self.downButtonTrigger)
 
+        # Change stove page up button
         self.upButtonTrigger.mark(self.page == self.PAGE_CHANGE_STOVE and self.rightButtonOneshot and not self.rightButtonHandled)
 
         self.newStove1Temperature.set(self.stove1Target + self.STOVE_TEMP_INC, self.stove1Target < self.STOVE_TEMP_MAX, self.STOVE_TEMP_MAX)
@@ -279,6 +311,7 @@ class BassieStove(simpylc.Module):
         self.createStopButtonTrigger.mark(self.page == self.PAGE_VIEW_TIMER and self.rightButtonOneshot and not self.rightButtonHandled)
         self.page.set(self.PAGE_CHANGE_TIMER, self.createStopButtonTrigger and not self.timerStarted)
         self.timerFinished.mark(False, self.createStopButtonTrigger and self.timerStarted)
+        self.beeperEnabled.mark(False, self.createStopButtonTrigger and self.timerStarted)
         self.timerStarted.mark(False, self.createStopButtonTrigger and self.timerStarted)
         self.rightButtonHandled.mark(True, self.createStopButtonTrigger)
 
@@ -299,9 +332,13 @@ class BassieStove(simpylc.Module):
         self.rightButtonHandled.mark(True, self.up2ButtonTrigger)
 
         # Trigger update screen when a button was handled
-        self.updateScreenTimer.reset(self.updateScreenTimer > 0.75)
-        self.updateScreen.mark(self.leftButtonHandled or self.middleButtonHandled or self.rightButtonHandled or (
+        self.updateScreenTimer.reset(self.page == self.PAGE_CHANGE_STOVE and self.updateScreenTimer >= 0.5)
+        self.updateScreenTimer.reset((self.page == self.PAGE_VIEW_TIMER and self.timerStarted) and self.updateScreenTimer >= 1)
+        self.updateScreen.mark(
+            self.leftButtonHandled or self.middleButtonHandled or self.rightButtonHandled or
+            (
                 self.page == self.PAGE_CHANGE_STOVE or
                 (self.page == self.PAGE_VIEW_TIMER and self.timerStarted)
-            ) and self.updateScreenTimer < 0.02)
+            ) and self.updateScreenTimer < 0.02
+        )
         self.cycleCounter.set(self.cycleCounter + 1)
